@@ -20,7 +20,7 @@ def _download(thing_number):
     print(f"Downloading {filename}...")
     urllib.request.urlretrieve(download_link, zippath)
 
-    filepath = zippath.rstrip(".zip")
+    filepath = zippath.rsplit(".zip", 1)[0]
 
     print(f"Extracting {filename}...")
     zipfile.ZipFile(zippath, "r").extractall(filepath)
