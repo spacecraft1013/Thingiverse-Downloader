@@ -51,6 +51,6 @@ filepath, filename = _download(args.thing_number)
 
 if not args.no_cura:
     stls = _find_stls(filepath, filename)
-    command = 'cura ' + ' '.join(stls)
+    command = 'ultimaker-cura ' + ' '.join(stls)
     print("Starting Cura...")
     subprocess.Popen(command)
