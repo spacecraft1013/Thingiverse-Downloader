@@ -1,41 +1,42 @@
-import urllib.request
-import os
-import zipfile
-import glob
 import argparse
-import requests
+import glob
+import io
+import os
+import re
 import subprocess
+import zipfile
 
-SAVE_PATH = "Put path here"
+import requests
 
-def _download(thing_number):
-    thing_link = f"https://www.thingiverse.com/thing:{thing_number}/zip"
+SAVE_PATH = ""
 
-    r = requests.get(thing_link)
-    download_link = r.url
-    filename = download_link.rsplit('/', 1)[1]
+def _download(thing_number, section):
+    thing_link = f"https://cdn.thingiverse.com/tv-zip/{thing_number}"
 
-    zippath = os.path.join(SAVE_PATH, filename)
+    r = requests.get(thing_link, allow_redirects=True, timeout=30)
+    assert r.ok, "Failed to download thing"
+    filename = re.findall('filename="(.+)\.zip"', r.headers.get('content-disposition'))[0]
+
+    if section is not None:
+        save_path = os.path.join(SAVE_PATH, section)
+    else:
+        save_path = SAVE_PATH
 
     print(f"Downloading {filename}...")
-    urllib.request.urlretrieve(download_link, zippath)
-
-    filepath = zippath.rsplit(".zip", 1)[0]
+    filepath = os.path.join(save_path, filename)
 
     print(f"Extracting {filename}...")
-    zipfile.ZipFile(zippath, "r").extractall(filepath)
-
-    os.remove(zippath)
+    zipfile.ZipFile(io.BytesIO(r.content)).extractall(filepath)
 
     return filepath, filename
 
 
-def _find_stls(path, filename):
+def _find_stls(path, file):
     if os.path.exists(os.path.join(path, "files")):
         path = os.path.join(path, "files")
 
-    elif os.path.exists(os.path.join(path, filename.rstrip(".zip"))):
-        path = os.path.join(path, filename.rstrip(".zip"))
+    elif os.path.exists(os.path.join(path, file)):
+        path = os.path.join(path, file)
 
     file_list = [f'"{path}"' for path in glob.glob(os.path.join(path, "*.stl"))]
 
@@ -44,13 +45,14 @@ def _find_stls(path, filename):
 
 parser = argparse.ArgumentParser(description='Downloads, extracts, and opens STL files from thingiverse')
 parser.add_argument('thing_number', type=int, metavar='N', help='Thing number from Thingiverse')
+parser.add_argument('--section', '-s', type=str, default=None, help='Section to put files in')
 parser.add_argument('--no-cura', help='Specify to not open cura after downloading files', action="store_true")
 args = parser.parse_args()
 
-filepath, filename = _download(args.thing_number)
+path, file = _download(args.thing_number, args.section)
 
 if not args.no_cura:
-    stls = _find_stls(filepath, filename)
-    command = 'ultimaker-cura ' + ' '.join(stls)
+    stls = _find_stls(path, file)
+    COMMAND = 'ultimaker-cura ' + ' '.join(stls)
     print("Starting Cura...")
-    subprocess.Popen(command)
+    subprocess.Popen(COMMAND)
